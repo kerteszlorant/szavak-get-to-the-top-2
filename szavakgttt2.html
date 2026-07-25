@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Szótanuló - by Jakab Viktória</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Konfetti könyvtár -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body {
+            background-color: #111827; 
+            color: #f3f4f6; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden; 
+        }
+
+        #app-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .app-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            padding-bottom: 80px; 
+            overflow-y: auto;
+        }
+
+        /* Flashcard Animációk */
+        .flip-card {
+            background-color: transparent;
+            perspective: 1000px;
+            height: 250px;
+            width: 100%;
+            cursor: pointer;
+        }
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            padding: 1.5rem;
+        }
+        .flip-card-front {
+            background: linear-gradient(145deg, #1e3a8a, #111827);
+            border: 1px solid #3b82f6;
+        }
+        .flip-card-back {
+            background: linear-gradient(145deg, #10b981, #047857);
+            color: white;
+            transform: rotateY(180deg);
+        }
+
+        /* Menü fa szerkezet */
+        .module-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .module-content.expanded {
+            max-height: 500px; 
+            overflow-y: auto; 
+        }
+        
+        /* Lufi animációk */
+        .balloon {
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-origin: bottom center;
+        }
+        .balloon.popped {
+            transform: scale(0);
+            opacity: 0;
+        }
+        .balloon.safe {
+            animation: float 2s ease-in-out infinite alternate;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(-3deg); }
+            100% { transform: translateY(-10px) rotate(3deg); }
+        }
+
+        /* Scramble stílusok */
+        #scramble-slots {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+        }
+        .scramble-word-container {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 2px;
+        }
+        .scramble-slot {
+            width: 35px; height: 45px;
+            border-bottom: 3px solid #4b5563;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem; font-weight: bold;
+        }
+        @media (min-width: 400px) {
+            .scramble-slot { width: 40px; height: 50px; font-size: 1.5rem; }
+        }
+        
+        .scramble-letter {
+            width: 40px; height: 40px;
+            background-color: #374151;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem; font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        @media (min-width: 400px) {
+            .scramble-letter { width: 45px; height: 45px; font-size: 1.25rem; }
+        }
+        .scramble-letter:active { transform: scale(0.95); }
+
+        /* Hulló szavak stílusok */
+        #falling-area {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            background: #1f2937;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #374151;
+            margin-bottom: 1rem;
+        }
+        .falling-word {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #8b5cf6;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+            white-space: nowrap;
+        }
+
+        /* Toast üzenet */
+        #toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 60;
+        }
+        #toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Lebegő "Next" gomb */
+        #floating-controls {
+            position: fixed;
+            bottom: 40px; 
+            left: 50%;
+            transform: translateX(-50%) translateY(150px);
+            width: 100%;
+            max-width: 580px; 
+            padding: 0 1rem;
+            z-index: 40;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+            opacity: 0;
+            pointer-events: none; 
+        }
+        #floating-controls.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+
+        #keyboard button {
+            width: calc(10% - 4px); 
+            min-width: 28px;
+            height: 40px;
+            font-size: 1rem;
+            margin: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- FEJLÉC -->
+    <header class="bg-gray-800 shadow-md p-4 sticky top-0 z-50 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-blue-400"><i class="fa-solid fa-graduation-cap mr-2"></i>Szótanuló</h1>
+        <div id="streak-counter" class="hidden text-orange-400 font-bold bg-gray-700 px-3 py-1 rounded-full text-sm">
+            <i class="fa-solid fa-fire mr-1"></i> <span id="streak-val">0</span>
+        </div>
+        <button id="btn-quit" onclick="forceQuit()" class="hidden text-gray-400 hover:text-red-400 p-2 text-xl transition">
+            <i class="fa-solid fa-house"></i>
+        </button>
+    </header>
+
+    <div id="toast" class="bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg font-bold flex items-center gap-2">
+        <i class="fa-solid fa-fire"></i> <span id="toast-msg">On fire!</span>
+    </div>
+
+    <!-- FŐ TARTALOM -->
+    <div id="app-wrapper">
+        <div class="app-container" id="app">
+            
+            <!-- FŐMENÜ NÉZET -->
+            <div id="view-menu" class="view-section w-full flex flex-col h-full">
+                <h2 class="text-2xl font-bold mb-4 text-center shrink-0">What are we crushing today?</h2>
+                
+                <div class="flex gap-2 mb-4 shrink-0">
+                    <button onclick="selectAll(true)" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-sm transition"><i class="fa-solid fa-check-double mr-1"></i> Grab all</button>
+                    <button onclick="selectAll(false)" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-sm transition"><i class="fa-solid fa-eraser mr-1"></i> Clear</button>
+                </div>
+
+                <div id="module-tree" class="bg-gray-800 rounded-xl p-2 mb-6 shadow-inner border border-gray-700 flex-1 overflow-y-auto min-h-[150px]"></div>
+
+                <div class="shrink-0">
+                    <h3 class="text-lg font-bold mb-3 text-gray-300">Choose your vibe:</h3>
+                    <div class="grid grid-cols-2 gap-3 mb-6">
+                        <button onclick="selectMode('flashcard')" id="btn-mode-flashcard" class="mode-btn bg-blue-600 py-3 rounded-lg font-bold shadow transition opacity-50"><i class="fa-regular fa-clone mr-1"></i> Flashcards</button>
+                        <button onclick="selectMode('quiz')" id="btn-mode-quiz" class="mode-btn bg-emerald-600 py-3 rounded-lg font-bold shadow transition opacity-50"><i class="fa-solid fa-list-ul mr-1"></i> Quiz</button>
+                        <button onclick="selectMode('typing')" id="btn-mode-typing" class="mode-btn bg-orange-600 py-3 rounded-lg font-bold shadow transition opacity-50"><i class="fa-regular fa-keyboard mr-1"></i> Typing</button>
+                        <button onclick="selectMode('mix')" id="btn-mode-mix" class="mode-btn bg-purple-600 py-3 rounded-lg font-bold shadow transition opacity-50 border-2 border-transparent"><i class="fa-solid fa-dice mr-1"></i> Challenge Mix</button>
+                    </div>
+
+                    <button onclick="startGame()" class="w-full bg-green-500 hover:bg-green-600 text-white text-xl font-bold py-4 rounded-xl shadow-lg transition-transform transform active:scale-95">
+                        DIVE IN <i class="fa-solid fa-play ml-2"></i>
+                    </button>
+                    <p id="selection-error" class="text-red-400 text-center mt-3 text-sm hidden">Hold up! Pick a lesson first.</p>
+                </div>
+            </div>
+
+            <!-- JÁTÉKTÉR NÉZET -->
+            <div id="view-game" class="view-section w-full hidden flex flex-col h-full">
+                
+                <div class="flex justify-between items-center text-sm text-gray-400 mb-2 shrink-0">
+                    <span id="progress-text">1 / 10</span>
+                    <span id="mistake-counter-ui"><i class="fa-solid fa-triangle-exclamation text-red-400 mr-1"></i> Oopsies: <span id="mistake-count">0</span></span>
+                </div>
+
+                <!-- Dinamikus indító üzenet -->
+                <div id="dynamic-start-msg" class="text-center text-xl font-bold text-yellow-400 mb-4 shrink-0 drop-shadow-md"></div>
+
+                <div class="w-full bg-gray-700 rounded-full h-2.5 mb-6 shrink-0">
+                    <div id="progress-bar" class="bg-blue-500 h-2.5 rounded-full transition-all duration-300" style="width: 10%"></div>
+                </div>
+
+                <div id="game-container" class="flex-1 flex flex-col items-center w-full"></div>
+                
+                <div class="h-16 shrink-0"></div>
+            </div>
+
+            <!-- EREDMÉNYEK NÉZET -->
+            <div id="view-result" class="view-section w-full hidden text-center flex flex-col h-full overflow-y-auto rounded-xl p-2">
+                <h2 class="text-3xl font-bold mb-2 mt-4" id="result-title">Nailed it!</h2>
+                
+                <div id="stars-container" class="text-4xl my-4 flex justify-center gap-2"></div>
+                <p id="result-message" class="text-xl mb-4 font-semibold text-gray-200"></p>
+                
+                <div id="stats-container" class="bg-gray-800 rounded-xl p-4 mb-6 text-left border border-gray-700 shadow-lg relative z-10">
+                    <div class="flex justify-between mb-3 border-b border-gray-700 pb-3">
+                        <span class="text-gray-400 flex items-center"><i class="fa-solid fa-list-ol mr-2"></i> Total words:</span>
+                        <span id="res-total" class="font-bold text-lg text-white"></span>
+                    </div>
+                    <div class="flex justify-between mb-3 border-b border-gray-700 pb-3">
+                        <span class="text-green-400 flex items-center"><i class="fa-solid fa-check-circle mr-2"></i> Flawless:</span>
+                        <span id="res-correct" class="font-bold text-lg text-green-400"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-red-400 flex items-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Needs work:</span>
+                        <span id="res-mistakes" class="font-bold text-lg text-red-400"></span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 mt-auto relative z-10">
+                    <button id="btn-show-damage" onclick="showReview()" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition flex justify-center items-center">
+                        <i class="fa-solid fa-magnifying-glass mr-2"></i> Show me the damage
+                    </button>
+                    <button id="btn-replay-mistakes" onclick="replayMistakes()" class="w-full bg-orange-500 hover:bg-orange-600 py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition hidden flex justify-center items-center">
+                        <i class="fa-solid fa-rotate-left mr-2"></i> Redo the oopsies
+                    </button>
+                    <button onclick="goHome()" class="w-full bg-gray-700 hover:bg-gray-600 py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition flex justify-center items-center">
+                        <i class="fa-solid fa-house mr-2"></i> Back to base
+                    </button>
+                </div>
+            </div>
+
+            <!-- VÁLASZOK MEGTEKINTÉSE NÉZET -->
+            <div id="view-review" class="view-section w-full hidden flex flex-col h-full">
+                <div class="flex justify-between items-center mb-4 shrink-0">
+                    <h2 id="review-title" class="text-2xl font-bold text-blue-400"><i class="fa-solid fa-clipboard-list mr-2"></i>The Damage</h2>
+                    <button onclick="closeReview()" class="bg-gray-700 px-4 py-2 rounded-lg font-bold hover:bg-gray-600 transition"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                
+                <div id="review-list" class="flex-1 overflow-y-auto bg-gray-800 rounded-xl p-3 flex flex-col gap-3 mb-4 border border-gray-700 shadow-inner"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- LEBEGŐ NEXT GOMB -->
+    <div id="floating-controls">
+        <button id="btn-next" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold text-lg shadow-[0_0_15px_rgba(37,99,235,0.5)] active:scale-95 transition flex justify-center items-center">
+            Next <i class="fa-solid fa-arrow-right ml-2"></i>
+        </button>
+    </div>
+
+    <!-- LÁBLÉC -->
+    <footer class="fixed bottom-0 w-full bg-gray-900 border-t border-gray-800 text-center py-2 text-gray-500 text-xs z-50">
+        by <span class="font-bold text-gray-400">Jakab Viktória</span>
+    </footer>
+
+    <script>
+        // TISZTÍTOTT ADATBÁZIS (Szófaj jelölések eltávolítva)
+        const rawData = `1|a|above|felül, felett
+1|a|at that time|akkor
+1|a|be bored of|un vmit
+1|a|brush my teeth|fogat mosok
+1|a|clean the windows|ablakot pucol
+1|a|do the washing-up|elmosogat
+1|a|during|alatt (időben), folyamán
+1|a|enjoy|kedvel, élvez
+1|a|floor|padló
+1|a|hang out with friends|barátokkal csavarog
+1|a|hate|utál
+1|a|have a shower|tusol, zuhanyozik
+1|a|help|segít
+1|a|How often...?|milyen gyakran?
+1|a|just|csak
+1|a|once|egyszer
+1|a|twice|kétszer
+1|a|three times|háromszor
+1|a|rarely|ritkán
+1|a|read magazines or newspapers|képes újságot vagy napilapot olvas
+1|a|Really?|Tényleg?
+1|a|sit around|üldögél
+1|a|study|tanul
+1|a|take out the rubbish|kiviszi a szemetet
+1|a|teenager|tinédzser
+1|a|tidy my room|kitakarítom a szobámat
+1|a|till|-ig, valameddig
+1|a|wake up|felébred
+1|a|wash the car|kocsit mos
+1|a|work|dolgozik
+1|b|café|kávézó
+1|b|draw pictures|képeket rajzol
+1|b|extra|pót-
+1|b|go camping|kempingezik
+1|b|Go on!|Gyerünk!, Hajrá!
+1|b|go to concerts|koncertre jár
+1|b|have drama lessons|színjátszókörbe jár
+1|b|It's great fun.|Nagyszerű dolog.
+1|b|join|belép, csatlakozik
+1|b|landscapes|tájkép
+1|b|Let me see|Hadd nézzem!
+1|b|move|mozog
+1|b|need|kell (szüksége van valamire)
+1|b|next|jövő, következő
+1|b|No, that's not for me.|Nem nekem való.
+1|b|paint pictures|képeket fest
+1|b|painting|festmény
+1|b|play board games|társasjátékot játszik
+1|b|play chess|sakkozik
+1|b|player|játékos
+1|b|portrait|arckép
+1|b|team|csapat
+1|b|want|akar
+1|b|What do you think?|Mi a véleményed? (Hogy tetszik?)
+1|b|youth club|fiatalok klubja
+1|c|also|is, szintén
+1|c|armchair|fotel
+1|c|best of all|legfőképp, elsősorban
+1|c|bookcase|könyvesszekrény
+1|c|carpet|szőnyeg
+1|c|clothes|ruha
+1|c|curtain|függöny
+1|c|ever|(tagadással) soha, valaha
+1|c|find|(meg)talál
+1|c|goldfish|aranyhal
+1|c|hamster|hörcsög
+1|c|keep out|belépni tilos
+1|c|lamp|lámpa
+1|c|leave|elhagy valamit, elmegy valahonnan
+1|c|messy|rendetlen
+1|c|mirror|tükör
+1|c|poster|poszter
+1|c|share|megoszt, egy szobában lakik vkivel
+1|c|shelf|polc
+1|c|spend time|időt tölt
+1|c|surf the Net|a Net-en böngészik
+1|c|telephone|telefon
+1|c|tidy|rendes, tiszta
+1|c|together|együtt
+1|c|use|használ
+1|c|wall|fal
+1|c|wardrobe|ruhásszekrény
+1|d|again|ismét, újra
+1|d|answer|válasz
+1|d|care about|törődik valamivel
+1|d|clever|okos
+1|d|enter a competition|versenyre benevez
+1|d|feel|érez
+1|d|friendly|barátságos
+1|d|funny|vicces
+1|d|hard-working|szorgalmas
+1|d|hour|óra (időtartam)
+1|d|important|fontos
+1|d|keep (possess)|megtart, eltesz (magának)
+1|d|kind|kedves
+1|d|laugh (at)|kinevet (valakit)
+1|d|lazy|lusta
+1|d|No way!|Szó sem lehet róla! Semmiképp
+1|d|only|csak
+1|d|other|más(ik)
+1|d|rude|udvariatlan
+1|d|sad|szomorú
+1|d|say|mond
+1|d|selfish|önző
+1|d|shy|félénk, visszahúzódó
+1|d|silly|nevetséges, ízléstelen (pl ruha)
+1|d|tell|mond
+1|d|unfriendly|barátságtalan
+1|d|wear|visel, hord
+1|d|What are you like?|Milyen vagy?
+1|d|What kind of...?|Milyen típusú ...?
+1|d|win|nyer
+1|Top Skills|almost|majdnem
+1|Top Skills|champion|bajnok
+1|Top Skills|chubby|pufók
+1|Top Skills|cool|remek, fantasztikus
+1|Top Skills|curly|göndör
+1|Top Skills|dark|sötét
+1|Top Skills|fair|szőke
+1|Top Skills|famous|híres
+1|Top Skills|good-looking|jóképű
+1|Top Skills|Guess what!|Képzeld!
+1|Top Skills|look good|jól néz ki
+1|Top Skills|medium-length|közepes hosszúságú
+1|Top Skills|meet|megismer(kedik), valakivel
+1|Top Skills|near|mellett
+1|Top Skills|news|hír
+1|Top Skills|quite|eléggé, meglehetősen
+1|Top Skills|slim|karcsú
+1|Top Skills|straight|egyenes
+1|Top Skills|trendy|divatos, menő
+1|Top Skills|wavy|hullámos
+1|Top Skills|What does he/she look like?|Hogy néz ki?
+1|Top Skills|Write back soon.|Válaszolj mielőbb. (Levél végén.)
+2|a|arrive|megérkezik
+2|a|bear|medve
+2|a|beach|(homokos) tengerpart
+2|a|believe|hisz
+2|a|by the river|a folyó mellett
+2|a|forest|erdő
+2|a|go for a walk|sétálni megy
+2|a|go on holiday|nyaralni megy
+2|a|have a lovely time|fantasztikusan érzi magát
+2|a|How's life?|Mi újság?
+2|a|island|sziget
+2|a|lake|tó
+2|a|last|múlt
+2|a|mountain|hegy
+2|a|on the way|útközben
+2|a|real|igazi
+2|a|sleep|alszik
+2|a|village|falu
+2|a|yesterday|tegnap
+2|b|be afraid of|fél valamitől
+2|b|day trip|egynapos kirándulás
+2|b|do water sports|vízi sportot űzni
+2|b|forget|elfelejt
+2|b|get out|kijön (vhonnan)
+2|b|go fishing|horgászni megy
+2|b|go for a swim|úszik egyet
+2|b|go on a picnic|piknikezni megy
+2|b|go on a trip|kirándulni megy
+2|b|goat|kecske
+2|b|happen|történik
+2|b|mistake|hiba
+2|b|perfect|tökéletes
+2|b|remember|emlékezik
+2|b|run|szalad, fut
+2|b|stay at a hotel|szállodában száll meg
+2|b|tree|fa
+2|b|visit famous sights|híres nevezetességeket néz meg
+2|b|weather|időjárás
+2|c|ago|ezelőtt
+2|c|angry|mérges
+2|c|avalanche|lavina
+2|c|fall down|lezuhan
+2|c|helicopter|helikopter
+2|c|horrible|borzalmas
+2|c|loud|hangos
+2|c|lucky|szerencsés
+2|c|noise|zaj
+2|c|on the slopes|sípályán, sípályákon
+2|c|pilot|pilóta
+2|c|save|megment
+2|c|scared|rémült, ijedt
+2|c|skiing|síelés, sí-
+2|c|snow|hó
+2|c|suddenly|hirtelen
+2|c|terrible|rettenetes
+2|c|ugly|csúnya, ronda
+2|c|unhappy|szomorú
+2|d|all over|mindenütt
+2|d|bathing costume|fürdőruha
+2|d|be ready|elkészül, kész van
+2|d|become|válik (vmivé); lesz
+2|d|change|átöltözik
+2|d|coach|távolsági autóbusz
+2|d|donkey|szamár
+2|d|drive|vezet
+2|d|even|még (nyomatékosító)
+2|d|in the past|a régi időkben, a múltban
+2|d|know how to do sth|tudja, hogy hogyan kell csinálni valamit
+2|d|popular|népszerű
+2|d|railway|vasút
+2|d|resort|turistaparadicsom
+2|d|ride|lovaglás
+2|d|seaside|tengerpart
+2|d|ship|hajó
+2|d|sunbathe|napozik
+2|d|suntan|(napbarnított bőrszín) barnaság
+2|d|thousand|ezer
+2|d|train|vonat
+2|d|travel|utazik
+2|Top Skills|another|egy másik
+2|Top Skills|backpack|hátizsák
+2|Top Skills|be/get lost|eltéved
+2|Top Skills|catch|fog (halat)
+2|Top Skills|delicious|finom
+2|Top Skills|get dark|sötétedik, esteledik
+2|Top Skills|go back|visszamegy
+2|Top Skills|luckily|szerencsére
+2|Top Skills|make a fire|tüzet rak
+2|Top Skills|map|térkép
+2|Top Skills|put up a tent|felállítja a sátrat
+2|Top Skills|sleeping bag|hálózsák
+2|Top Skills|smoke|füst
+2|Top Skills|start|(el)kezd
+2|Top Skills|torch|elemlámpa
+3|a|Europe|Európa
+3|a|pack bags|becsomagol az utazáshoz
+3|a|stop|megállóhely
+3|a|tomorrow|holnap
+3|a|tonight|ma éjjel
+3|b|Asia|Ázsia
+3|b|billion|ezer milliárd, billió
+3|b|capital city|főváros
+3|b|choose|választ
+3|b|continent|kontinens
+3|b|east|kelet
+3|b|information|információ
+3|b|invent|feltalál
+3|b|library|könyvtár
+3|b|north|észak
+3|b|on the Internet|a Net-en
+3|b|paper|papír
+3|b|pasta|tészta
+3|b|population|népesség
+3|b|project|projekt (beadandó iskolai feladat)
+3|b|right|helyes
+3|b|search|keres, kutat
+3|b|shout|kiabál
+3|b|south|dél
+3|b|west|nyugat
+3|b|wrong|téves
+3|c|bird|madár
+3|c|cheap|olcsó
+3|c|expensive|drága
+3|c|fantastic|fantasztikus
+3|c|far|távol, messze
+3|c|farm|gazdaság, farm
+3|c|fast|gyors
+3|c|high|magas
+3|c|kiwi|1. kiwi (gyümölcs) 2. kiwi (madár)
+3|c|large|hatalmas
+3|c|low|alacsony
+3|c|metre (m)|méter
+3|c|million|millió
+3|c|native|őslakos
+3|c|noisy|hangos
+3|c|Oceania|Óceánia
+3|c|outside|vmin kívül, a környékén
+3|c|quiet|csendes
+3|c|rugby|rögbi
+3|c|sheep|juh(ok)
+3|c|slow|lassú
+3|d|a group of|raj (halaknál)
+3|d|America|Amerika
+3|d|area|terület, környék
+3|d|building|épület
+3|d|carnival|karnevál
+3|d|cow|tehén
+3|d|cute|aranyos
+3|d|dangerous|veszélyes
+3|d|kilometre (km)|kilométer
+3|d|minute|perc
+3|d|modern|korszerű
+3|d|ocean|óceán
+3|d|official language|hivatalos nyelv
+3|d|piranha|piranha (halfaj)
+3|d|plant|növény
+3|d|Portuguese|portugál
+3|d|rainforest|esőerdő
+3|d|rich|gazdag
+3|d|strange|különös, furcsa
+3|Top Skills|Africa|Afrika
+3|Top Skills|ancient|(ős)régi, ókori
+3|Top Skills|camel riding|teveháton utazni
+3|Top Skills|excited|izgatott
+3|Top Skills|go hiking|túrázik
+3|Top Skills|go on a cruise|tengeri hajótúrán vesz részt, hajózik
+3|Top Skills|go on a safari|szafari kiránduláson vesz részt
+3|Top Skills|go sailing|vitorlázik
+3|Top Skills|go sightseeing|városnézésen vesz részt
+3|Top Skills|learn|megtud
+3|Top Skills|market|piac
+3|Top Skills|pyramid|piramis
+4|a|amazing|bámulatos
+4|a|artist|művész
+4|a|astronaut|űrhajós
+4|a|be born|születik
+4|a|be crazy about|rajong valamiért
+4|a|be interested in|érdeklődik valami iránt
+4|a|But that's not all.|De ez még nem minden.
+4|a|century|évszázad
+4|a|die|meghal
+4|a|exactly|pontosan
+4|a|full name|teljes név
+4|a|like|mint például
+4|a|moon|hold
+4|a|name sb after sb|elnevez valamikiről valamit
+4|a|planetarium|planetárium
+4|a|same|ugyanaz
+4|a|space travel|űrutazás
+4|b|ankle|boka
+4|b|back|hát
+4|b|Believe it or not.|Akár hiszed, akár nem.
+4|b|break|eltör
+4|b|chase|kerget
+4|b|crash (into)|belerohan (autóval) vmibe
+4|b|fall off|leesik valamiről
+4|b|have an accident|balesetet szenved
+4|b|hit|beüt (pl. fejét)
+4|b|hurt|megsérül
+4|b|It's a long story|Hosszú történet.
+4|b|jump off|leugrik valahonnan
+4|b|knee|térd
+4|b|Ouch!|Jaj! (fájdalom kifejezésére)
+4|b|Poor you!|Szegény! (együttérzés kifejezésére)
+4|b|seatbelt|biztonsági öv
+4|b|slip|megcsúszik
+4|b|sprain|kificamít
+4|b|What's the matter with you?|Mi bajod van?
+4|b|wrist|csukló
+4|c|adventure|kaland
+4|c|alive|élő, életben levő
+4|c|as soon as|amint
+4|c|careful|óvatos
+4|c|carry|cipel
+4|c|climber|hegymászó
+4|c|cry|sír
+4|c|dead|halott
+4|c|early|korai
+4|c|hard (difficult)|bonyolult, nehéz
+4|c|however|de, azonban
+4|c|hurt|sérült
+4|c|instead of|... helyett
+4|c|late|elkéső (késésben lévő), késik
+4|c|leader|vezető
+4|c|look back|hátranéz, visszatekint
+4|c|missing|eltűnt
+4|c|nightmare|rémálom
+4|c|quickly|gyorsan
+4|c|slowly|lassan
+4|c|snowstorm|hóvihar
+4|c|top|csúcs
+4|c|unfortunately|sajnos
+4|c|while|mialatt
+4|d|award|díj
+4|d|be over|véget ér
+4|d|come back|visszatérés
+4|d|cycling|kerékpározás
+4|d|cyclist|kerékpáros
+4|d|decide|elhatároz
+4|d|forever|örökké
+4|d|for good|véglegesen, örökre
+4|d|in the beginning|kezdetben
+4|d|pain|fájdalom
+4|d|race|verseny; versenyez
+4|d|success|siker
+4|d|unbelievably|hihetetlenül
+4|d|university|egyetem
+4|d|What does he/she do?|Mi a foglalkozása?
+4|d|writer|író
+4|Top Skills|attic|padlás
+4|Top Skills|creepy|hátborzongató
+4|Top Skills|disappear|eltűnik
+4|Top Skills|embarrassed|szégyenkező, (kellemetlen helyzetbe került ember), zavarban van
+4|Top Skills|frightened|rémült, ijedt
+4|Top Skills|ghost|szellem
+4|Top Skills|haunted house|kísértetjárta ház
+4|Top Skills|hear|hall
+4|Top Skills|light|lámpa
+4|Top Skills|look for|keres vmit
+4|Top Skills|mystery|rejtély
+4|Top Skills|owl|bagoly
+4|Top Skills|scary|ijesztő
+4|Top Skills|scream|sikolt
+4|Top Skills|sell|elad
+4|Top Skills|shocked|megdöbbent, ijedt
+4|Top Skills|sign|jel
+4|Top Skills|surprised|meglepődött
+4|Top Skills|switch on|bekapcsol (pl tévét)
+4|Top Skills|thrilled|izgatott, felvillanyozott
+4|Top Skills|violin|hegedű
+4|Top Skills|visitor|látogató
+4|Top Skills|warm|meleg
+5|a|airport|repülőtér
+5|a|Anything else?|Szolgálhatok még valamivel? Óhajt még valamit?
+5|a|cappuccino|kávés ital, cappuccino
+5|a|car park|parkoló
+5|a|coke|kóla
+5|a|double|hosszúkávé
+5|a|doughnut|fánk
+5|a|espresso|feketekávé
+5|a|gentleman|úriember
+5|a|Here you are, sir.|Tessék, uram. (amikor átnyújtunk valamit)
+5|a|I'm afraid...|sajnos
+5|a|information desk|információpult
+5|a|Just a minute.|Várjon egy pillanatot.
+5|a|key|kulcs
+5|a|May I...?|(udvariasan kérünk valamit)
+5|a|medium|közepes
+5|a|museum|múzeum
+5|a|passport|útlevél
+5|a|petrol station|benzinkút
+5|a|seat|ülőhely
+5|a|single|presszókávé
+5|a|stadium|stadion
+5|a|train station|vasútállomás
+5|a|view|kilátás (szobáé)
+5|a|wait|vár
+5|b|across|át, keresztül
+5|b|answer|felvesz (telefont)
+5|b|bank|bank
+5|b|call|(fel)hív (telefonon)
+5|b|chemist's|gyógyszertár
+5|b|Go on!|Rajta! (ösztönzés)
+5|b|go straight on|egyenesen tovább halad (úton)
+5|b|go up|északi irányba megy
+5|b|go down|déli irányba halad
+5|b|go along|valami mentén halad
+5|b|How about (+ -ing)?|És mi lenne ha...? Mit szólnál ahhoz, hogy...?
+5|b|How do I get there?|Hogyan jutok el oda?
+5|b|lose|elveszít
+5|b|newsagent's|újságos pavilon
+5|b|on the left|balra, a bal oldalon
+5|b|on the right|jobbra, a jobb oldalon
+5|b|opposite|szemben
+5|b|ring|cseng (telefon)
+5|b|road|út
+5|b|street|utca
+5|b|avenue|fasor, fákkal szegélyezett széles út városban, sétány
+5|b|straightaway|rögtön, nyomban
+5|b|take the second turning|a második elágazásnál befordul
+5|b|the end of|valaminek a vége
+5|b|through|át, keresztül
+5|b|traffic lights|közlekedési lámpa
+5|b|turn left|balra fordul
+5|b|turn right at|jobbra fordul a ....-nál
+5|b|turn into|befordul
+5|b|Why don't we....?|(amikor valamilyen javaslattal hozakodunk elő) Mi lenne ha...? Miért nem (csináljuk ezt vagy azt)?
+5|c|activity|tevékenység
+5|c|air pollution|légszennyeződés
+5|c|build|épít
+5|c|can|fém üdítős/sörös doboz
+5|c|celebrate|(meg)ünnepel
+5|c|clean|tiszta
+5|c|clean up|feltakarít
+5|c|collect|összeszed, összegyűjt
+5|c|cut down|kivág (fát)
+5|c|earth|a Föld
+5|c|energy|energia
+5|c|environment|környezet
+5|c|for example|például
+5|c|get together|összejön, gyülekezik
+5|c|litter|szemét
+5|c|nature|természet
+5|c|organise|szervez
+5|c|plan (to)|eltervez
+5|c|plant|ültet (fát)
+5|c|protect|megvéd, óv
+5|c|public transport|tömegközlekedés
+5|c|put|rak, helyez
+5|c|recycle|újrahasznosít
+5|c|recycling bin|szelektív hulladékgyűjtő
+5|c|take part in|részt vesz valamiben
+5|c|take place|(le)zajlik
+5|c|tap|csap
+5|c|throw|(el)dob
+5|c|traffic jam|közlekedési dugó
+5|c|turn off|elzár, elolt, lekapcsol
+5|c|welcome|szívesen látott személy
+5|d|appear|megjelenik
+5|d|cab|taxi
+5|d|close|zárt
+5|d|cost|kerül vmennyibe
+5|d|crowded|zsúfolt
+5|d|double-decker|emeletes busz
+5|d|line|vonal
+5|d|means of transport|járművek
+5|d|motorbike|motorkerékpár
+5|d|on foot|gyalog
+5|d|passenger|utas
+5|d|probably|valószínű(leg)
+5|d|pull|húz
+5|d|safe|biztonságos
+5|d|still|még mindig
+5|d|subway / metro / tube|metro
+5|d|tram|villamos
+5|d|underground|földalatti
+5|d|way|út
+5|d|Which...?|Melyik...?
+5|Top Skills|bring|hoz
+5|Top Skills|castle|vár, kastély
+5|Top Skills|central|központi
+5|Top Skills|finally|végül
+5|Top Skills|magnificent|mesés
+5|Top Skills|palace|palota
+5|Top Skills|See you soon.|Viszlát!
+5|Top Skills|skyscraper|felhőkarcoló
+5|Top Skills|souvenirs|ajándékok
+5|Top Skills|square|tér
+5|Top Skills|theme park|vidámpark
+5|Top Skills|tourist|turista
+5|Top Skills|tower|torony
+5|Top Skills|What's the weather like?|Milyen az idő?
+6|a|balloon|léggömb
+6|a|cloud|felhő
+6|a|contain|tartalmaz
+6|a|correctly|megfelelően, helyesen
+6|a|experiment|kísérlet
+6|a|fat|kövér
+6|a|fill|megtölt
+6|a|main|alap-, fő-
+6|a|mix|összekever
+6|a|neighbour|szomszéd
+6|a|rain|eső
+6|a|rainbow|szivárvány
+6|a|relax|pihen, lazít
+6|a|seem|tűnik (valamilyennek)
+6|a|sky|égbolt
+6|a|spray|spriccel
+6|a|Sun|a Nap
+6|a|sunlight|napfény
+6|b|anyway|Igaz is! Hogy el ne felejtsem!
+6|b|be away|távol van, elutazik
+6|b|disgusting|undorító
+6|b|encyclopaedia|enciklopédia
+6|b|giant|óriás
+6|b|kilogram (kg)|kilogramm
+6|b|live|élő, eleven
+6|b|look after|gondoskodik valamiről
+6|b|look forward to|alig vár valamit
+6|b|look out|Vigyázz!
+6|b|look up|(szótárban) kikeres (egy szót)
+6|b|monster|szörnyeteg
+6|b|photo|fényképezőgép / fénykép
+6|b|promise|megígér
+6|b|scientist|tudós
+6|b|seafood|tengeri étel (pl.: hal, rák,...stb)
+6|b|squid|polip
+6|b|take care of|vigyáz valakire, gondját viseli
+6|b|try|próbál
+6|c|as|olyan, mint
+6|c|camera|fényképezőgép
+6|c|damage|kárt okoz
+6|c|directly|közvetlenül, egyenesen
+6|c|dry|száraz
+6|c|especially|különösen
+6|c|fit|beilleszt, berak
+6|c|future|jövő
+6|c|galaxy|galaxis
+6|c|heat (n)|hő
+6|c|in the end|végül
+6|c|It takes...|tart vmeddig; (valamennyi) időt vesz igénybe
+6|c|planet|bolygó
+6|c|powerful|hatalmas
+6|c|send out|kibocsát
+6|c|shine|süt (a nap)
+6|c|solar system|naprendszer
+6|c|star|csillag
+6|c|surface|felszín
+6|c|telescope|távcső
+6|c|temperature|hőmérséklet
+6|c|turn into|valamivé válik, átalakul
+6|c|warning|figyelmeztetés
+6|d|a bit|egy kicsit, kissé
+6|d|alone|egyedül
+6|d|as|mivel
+6|d|back in time|vissza az időben
+6|d|be in trouble|bajban van
+6|d|button|gomb
+6|d|change one's mind|meggondolja magát
+6|d|confused|zavarodott
+6|d|dinosaur|dinoszaurusz
+6|d|hold|kézben tart, fog
+6|d|I couldn't believe my eyes.|Nem hittem a szememnek.
+6|d|I have no idea.|Fogalmam sincs.
+6|d|It's brilliant.|nagyszerű
+6|d|machine|gép
+6|d|press|(meg)nyom
+6|d|push|valamit nyom (a kezébe)
+6|d|show|mutat
+6|d|Thank goodness!|Hála az égnek!
+6|d|worried|nyugtalan, aggódó
+6|Top Skills|3D films|3 dimenziós film
+6|Top Skills|accept|elfogad
+6|Top Skills|afterwards|azután
+6|Top Skills|definitely|holt biztos
+6|Top Skills|hope|remél
+6|Top Skills|How could I say no?|Persze, hogy jövök. Hogy is mondhatnék nemet?
+6|Top Skills|I can't make it.|Nem tudok jönni.
+6|Top Skills|I'm sure.|Biztos vagyok benne.
+6|Top Skills|invitation|meghívás
+6|Top Skills|invite|meghív
+6|Top Skills|It sounds ...|(valahogy) .... hangzik
+6|Top Skills|It's nice of you.|Kedves tőled.
+6|Top Skills|Let me know...|Tudasd velem ...
+6|Top Skills|refuse|elutasít, visszautasít
+6|Top Skills|Take care.|Vigyázz magadra. (Búcsúzáskor)
+6|Top Skills|Waiting for your reply.|Várom válaszod. (levél befejezéseként)`;
+
+        let allWords = [];
+        let filteredWords = [];
+        let gameQueue = [];
+        let mixDeck = []; 
+        let currentWord = null;
+        let mistakes = []; 
+        let sessionResults = []; 
+        let totalWordsToPlay = 0;
+        let streak = 0;
+        let isRedoRound = false;
+        
+        let currentMode = 'flashcard'; 
+        let isFlashcardMode = false;
+        let wordMemory = [];
+        let optionsPool = [];
+
+        function parseData() {
+            const lines = rawData.trim().split('\n');
+            lines.forEach((line, index) => {
+                const parts = line.split('|');
+                if (parts.length === 4) {
+                    allWords.push({ id: index, mod: parts[0], les: parts[1], en: parts[2].trim(), hu: parts[3].trim() });
+                }
+            });
+            buildMenu();
+        }
+
+        function buildMenu() {
+            const tree = document.getElementById('module-tree');
+            tree.innerHTML = '';
+            const modules = [...new Set(allWords.map(w => w.mod))].sort((a,b) => parseInt(a)-parseInt(b));
+
+            modules.forEach(mod => {
+                const modWords = allWords.filter(w => w.mod === mod);
+                const lessons = [...new Set(modWords.map(w => w.les))];
+                const modDiv = document.createElement('div');
+                modDiv.className = 'mb-2';
+                
+                const header = document.createElement('div');
+                header.className = 'flex items-center bg-gray-700 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition';
+                
+                // Szószám a modulhoz
+                header.innerHTML = `
+                    <input type="checkbox" class="mod-checkbox w-5 h-5 mr-3 accent-blue-500" data-mod="${mod}">
+                    <span class="font-bold text-lg flex-1" onclick="toggleModule('${mod}')">Module ${mod} <span class="text-sm text-gray-400 font-normal ml-2">(${modWords.length} words)</span></span>
+                    <i class="fa-solid fa-chevron-down text-gray-400" id="icon-${mod}" onclick="toggleModule('${mod}')"></i>
+                `;
+                
+                const content = document.createElement('div');
+                content.id = `content-${mod}`;
+                content.className = 'module-content pl-8 pr-2 mt-1 flex flex-col gap-2';
+
+                lessons.forEach(les => {
+                    const lesCount = modWords.filter(w => w.les === les).length;
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center p-2 hover:bg-gray-700 rounded cursor-pointer';
+                    // Szószám a leckéhez (Top Skillsnél nem írjuk elé a modulszámot)
+                    const labelName = les === 'Top Skills' ? 'Top Skills' : mod + les;
+                    label.innerHTML = `
+                        <input type="checkbox" class="les-checkbox w-4 h-4 mr-3 accent-blue-400" data-mod="${mod}" value="${les}">
+                        <span>${labelName} <span class="text-xs text-gray-400 ml-1">(${lesCount} words)</span></span>
+                    `;
+                    content.appendChild(label);
+                });
+
+                modDiv.appendChild(header);
+                modDiv.appendChild(content);
+                tree.appendChild(modDiv);
+
+                const modCheck = header.querySelector('.mod-checkbox');
+                const lesChecks = content.querySelectorAll('.les-checkbox');
+
+                modCheck.addEventListener('change', (e) => {
+                    lesChecks.forEach(cb => cb.checked = e.target.checked);
+                });
+                lesChecks.forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        const allChecked = Array.from(lesChecks).every(c => c.checked);
+                        const someChecked = Array.from(lesChecks).some(c => c.checked);
+                        modCheck.checked = allChecked;
+                        modCheck.indeterminate = someChecked && !allChecked;
+                    });
+                });
+            });
+        }
+
+        function toggleModule(mod) {
+            const content = document.getElementById(`content-${mod}`);
+            const icon = document.getElementById(`icon-${mod}`);
+            content.classList.toggle('expanded');
+            icon.classList.toggle('fa-chevron-up');
+            icon.classList.toggle('fa-chevron-down');
+        }
+
+        function selectAll(check) {
+            document.querySelectorAll('.mod-checkbox, .les-checkbox').forEach(cb => {
+                cb.checked = check;
+                cb.indeterminate = false;
+            });
+        }
+
+        function selectMode(mode) {
+            currentMode = mode;
+            isFlashcardMode = (mode === 'flashcard');
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('border-white', 'opacity-100');
+                btn.classList.add('opacity-50', 'border-transparent');
+            });
+            const activeBtn = document.getElementById(`btn-mode-${mode}`);
+            activeBtn.classList.remove('opacity-50', 'border-transparent');
+            activeBtn.classList.add('border-white', 'opacity-100');
+        }
+
+        function generateMixDeck(totalWords) {
+            let deck = [];
+            let fwCount = Math.round(totalWords * 0.50);
+            let scCount = Math.round(totalWords * 0.20);
+            let hmCount = Math.round(totalWords * 0.20);
+            let qzCount = totalWords - fwCount - scCount - hmCount;
+            
+            for(let i=0; i<fwCount; i++) deck.push('falling');
+            for(let i=0; i<scCount; i++) deck.push('scramble');
+            for(let i=0; i<hmCount; i++) deck.push('hangman');
+            for(let i=0; i<qzCount; i++) deck.push('quiz');
+
+            return shuffleArray(deck);
+        }
+
+        function startGame(redoWords = null) {
+            document.getElementById('selection-error').classList.add('hidden');
+            if (fallingWordInterval) clearInterval(fallingWordInterval);
+            hideNextButton(); 
+            
+            if (redoWords) {
+                isRedoRound = true;
+                filteredWords = redoWords;
+            } else {
+                isRedoRound = false;
+                const checkedLessons = [];
+                document.querySelectorAll('.les-checkbox:checked').forEach(cb => {
+                    checkedLessons.push({ mod: cb.getAttribute('data-mod'), les: cb.value });
+                });
+                if (checkedLessons.length === 0) {
+                    document.getElementById('selection-error').classList.remove('hidden');
+                    return;
+                }
+                filteredWords = allWords.filter(w => checkedLessons.some(c => c.mod === w.mod && c.les === w.les));
+            }
+
+            mistakes = []; 
+            sessionResults = [];
+            streak = 0;
+            updateStreakUI();
+            
+            if (currentMode === 'mix' && !redoWords) {
+                gameQueue = shuffleArray([...filteredWords]).slice(0, 10);
+            } else {
+                gameQueue = shuffleArray([...filteredWords]);
+            }
+            
+            totalWordsToPlay = gameQueue.length;
+            optionsPool = [...allWords];
+            
+            if(currentMode === 'mix') {
+                mixDeck = generateMixDeck(totalWordsToPlay);
+            }
+
+            document.getElementById('view-menu').classList.add('hidden');
+            document.getElementById('view-result').classList.add('hidden');
+            document.getElementById('view-review').classList.add('hidden');
+            document.getElementById('view-game').classList.remove('hidden');
+            document.getElementById('btn-quit').classList.remove('hidden');
+            
+            // Dinamikus laza szöveg beállítása a kezdéshez
+            const msgEl = document.getElementById('dynamic-start-msg');
+            if (msgEl) {
+                if (totalWordsToPlay <= 15) {
+                    msgEl.innerText = `Piece of cake. Let's smash these ${totalWordsToPlay} words!`;
+                } else if (totalWordsToPlay <= 40) {
+                    msgEl.innerText = `Let's smash these ${totalWordsToPlay} words!`;
+                } else if (totalWordsToPlay <= 80) {
+                    msgEl.innerText = `Epic challenge! ${totalWordsToPlay} words to conquer!`;
+                } else {
+                    msgEl.innerText = `Boss level unlocked: ${totalWordsToPlay} words. Good luck!`;
+                }
+            }
+
+            if(isFlashcardMode) {
+                document.getElementById('mistake-counter-ui').classList.add('hidden');
+                document.getElementById('streak-counter').classList.add('hidden');
+            } else {
+                document.getElementById('mistake-counter-ui').classList.remove('hidden');
+                document.getElementById('streak-counter').classList.remove('hidden');
+            }
+            
+            nextWord();
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function nextWord() {
+            if (fallingWordInterval) clearInterval(fallingWordInterval);
+            hideNextButton();
+
+            if (gameQueue.length === 0) { endGame(); return; }
+            if (gameQueue.length > 1 && wordMemory.includes(gameQueue[0].id)) {
+                const moveIdx = Math.min(3, gameQueue.length - 1);
+                [gameQueue[0], gameQueue[moveIdx]] = [gameQueue[moveIdx], gameQueue[0]];
+            }
+
+            currentWord = gameQueue.shift();
+            
+            const currentNum = totalWordsToPlay - gameQueue.length;
+            document.getElementById('progress-text').innerText = `${currentNum} / ${totalWordsToPlay}`;
+            document.getElementById('progress-bar').style.width = `${(currentNum / totalWordsToPlay) * 100}%`;
+            document.getElementById('mistake-count').innerText = mistakes.length;
+
+            let activeMode = currentMode;
+            if (currentMode === 'mix') {
+                activeMode = mixDeck.shift();
+            }
+
+            if (activeMode === 'flashcard') renderFlashcard();
+            else if (activeMode === 'quiz') renderQuiz();
+            else if (activeMode === 'typing') renderTyping();
+            else if (activeMode === 'hangman') renderHangman();
+            else if (activeMode === 'scramble') renderScramble();
+            else if (activeMode === 'falling') renderFallingWords();
+        }
+
+        function handleAnswer(isCorrect, isHintUsed = false, autoAdvance = false) {
+            if (!isFlashcardMode) {
+                sessionResults.push({ word: currentWord, correct: (isCorrect && !isHintUsed) });
+                if (!isCorrect || isHintUsed) {
+                    mistakes.push(currentWord);
+                    streak = 0;
+                } else {
+                    streak++;
+                    checkStreak();
+                    wordMemory.push(currentWord.id);
+                    if(wordMemory.length > 20) wordMemory.shift();
+                }
+                updateStreakUI();
+            }
+
+            if (autoAdvance && isCorrect && !isFlashcardMode) {
+                setTimeout(() => {
+                    nextWord();
+                }, 1000); 
+            } else {
+                showNextButton();
+                const btnNext = document.getElementById('btn-next');
+                btnNext.onclick = () => {
+                    nextWord(); 
+                };
+            }
+        }
+
+        function showNextButton() {
+            document.getElementById('floating-controls').classList.add('visible');
+        }
+        function hideNextButton() {
+            document.getElementById('floating-controls').classList.remove('visible');
+        }
+
+        function forceQuit() {
+            if(fallingWordInterval) clearInterval(fallingWordInterval);
+            hideNextButton();
+            endGame(true); 
+        }
+
+        function updateStreakUI() {
+            document.getElementById('streak-val').innerText = streak;
+            const counter = document.getElementById('streak-counter');
+            if(streak > 0) {
+                counter.classList.add('text-orange-400'); counter.classList.remove('text-gray-400');
+            } else {
+                counter.classList.remove('text-orange-400'); counter.classList.add('text-gray-400');
+            }
+            document.getElementById('mistake-count').innerText = mistakes.length;
+        }
+        function checkStreak() { if (streak > 0 && streak % 5 === 0) showToast(`On fire! 🔥`); }
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        // --- 1. FLASHCARD ---
+        function renderFlashcard() {
+            const container = document.getElementById('game-container');
+            const lesName = currentWord.les === 'Top Skills' ? 'Top Skills' : currentWord.mod + currentWord.les;
+            container.innerHTML = `
+                <div class="text-center mb-6 w-full">
+                    <span class="bg-gray-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-gray-300">MOD ${lesName}</span>
+                </div>
+                <div class="flip-card" id="flashcard" onclick="flipCard()">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <i class="fa-solid fa-eye text-4xl text-blue-300 mb-4"></i>
+                            <h3 class="text-3xl font-bold text-center px-2">${currentWord.hu}</h3>
+                            <p class="text-sm text-gray-400 mt-4"><i class="fa-solid fa-hand-pointer mr-1"></i> Tap to flip</p>
+                        </div>
+                        <div class="flip-card-back">
+                            <i class="fa-solid fa-check text-4xl mb-4 text-green-200"></i>
+                            <h3 class="text-3xl font-bold text-center px-2">${currentWord.en}</h3>
+                        </div>
+                    </div>
+                </div>
+            `;
+            showNextButton();
+            const btn = document.getElementById('btn-next');
+            btn.innerHTML = 'Next <i class="fa-solid fa-arrow-right ml-2"></i>';
+            btn.onclick = () => { handleAnswer(true); btn.click(); };
+        }
+        function flipCard() { document.getElementById('flashcard').classList.toggle('flipped'); }
+
+        // --- 2. QUIZ ---
+        function renderQuiz() {
+            const container = document.getElementById('game-container');
+            let choices = [currentWord.en];
+            let pool = shuffleArray([...optionsPool]).filter(w => w.id !== currentWord.id);
+            for(let i=0; i<3; i++) if(pool[i]) choices.push(pool[i].en);
+            choices = shuffleArray(choices);
+
+            let html = `
+                <div class="text-center mb-6 w-full">
+                    <h3 class="text-gray-400 text-sm mb-1 uppercase tracking-widest">Select the pair</h3>
+                    <h2 class="text-3xl font-bold text-white px-2">${currentWord.hu}</h2>
+                </div>
+                <div class="w-full flex flex-col gap-3" id="quiz-options">
+            `;
+            choices.forEach(choice => {
+                html += `<button onclick="checkQuiz('${choice.replace(/'/g, "\\'")}', this)" class="w-full bg-gray-800 hover:bg-gray-700 border border-gray-600 py-4 px-6 rounded-xl text-left font-semibold text-lg transition shadow-md">${choice}</button>`;
+            });
+            container.innerHTML = html + `</div><div id="quiz-feedback" class="h-8 mt-4 font-bold text-center w-full"></div>`;
+        }
+        function checkQuiz(selected, btnElement) {
+            const buttons = document.getElementById('quiz-options').querySelectorAll('button');
+            buttons.forEach(b => b.disabled = true);
+            const isCorrect = (selected === currentWord.en);
+            const feedback = document.getElementById('quiz-feedback');
+            
+            if (isCorrect) {
+                btnElement.classList.replace('bg-gray-800', 'bg-green-600');
+                btnElement.classList.replace('border-gray-600', 'border-green-500');
+                feedback.innerHTML = '<span class="text-green-500"><i class="fa-solid fa-check"></i> Perfect!</span>';
+            } else {
+                btnElement.classList.replace('bg-gray-800', 'bg-red-600');
+                btnElement.classList.replace('border-gray-600', 'border-red-500');
+                feedback.innerHTML = '<span class="text-red-500"><i class="fa-solid fa-xmark"></i> Oops!</span>';
+                buttons.forEach(b => { if (b.innerText === currentWord.en) b.classList.replace('bg-gray-800', 'bg-green-600'); });
+            }
+            handleAnswer(isCorrect, false, true);
+        }
+
+        // --- 3. TYPING ---
+        let typeHintLevel = 0;
+        function renderTyping() {
+            typeHintLevel = 0;
+            const container = document.getElementById('game-container');
+            container.innerHTML = `
+                <div class="text-center mb-6 w-full">
+                    <h3 class="text-gray-400 text-sm mb-1 uppercase tracking-widest">Type it out</h3>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white px-2">${currentWord.hu}</h2>
+                </div>
+                <div class="w-full relative">
+                    <input type="text" id="type-input" class="w-full bg-gray-800 border-2 border-gray-600 rounded-xl px-4 py-4 text-xl text-center text-white focus:outline-none focus:border-orange-500 transition shadow-inner" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="...">
+                    <button onclick="useHintTyping()" id="btn-hint" class="absolute right-3 top-3 bg-gray-700 hover:bg-gray-600 p-2 rounded-lg text-yellow-400"><i class="fa-solid fa-lightbulb"></i></button>
+                </div>
+                <div id="type-feedback" class="mt-4 text-center text-lg font-bold w-full h-8"></div>
+                
+                <button onclick="checkTyping()" id="btn-type-check" class="mt-4 w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition">Check Answer</button>
+            `;
+            if(window.innerWidth > 768) {
+                setTimeout(() => document.getElementById('type-input').focus(), 100);
+            }
+            document.getElementById('type-input').addEventListener('keypress', e => { if (e.key === 'Enter') checkTyping(); });
+        }
+
+        function cleanString(str) {
+            return str
+                .toLowerCase()
+                .replace(/[\u2018\u2019\u0060\u00b4]/g, "'")
+                .replace(/[\u00a0\u200b]/g, '')
+                .replace(/\s+/g, ' ')
+                .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, '')
+                .trim();
+        }
+
+        function useHintTyping() {
+            typeHintLevel++;
+            const input = document.getElementById('type-input');
+            const target = currentWord.en;
+            if(typeHintLevel <= target.length) {
+                input.value = target.substring(0, typeHintLevel);
+            }
+        }
+
+        function checkTyping() {
+            const input = document.getElementById('type-input');
+            const rawTyped = input.value;
+            const rawTarget = currentWord.en;
+            
+            const feedback = document.getElementById('type-feedback');
+            
+            document.getElementById('btn-type-check').classList.add('hidden');
+            input.disabled = true; document.getElementById('btn-hint').disabled = true;
+
+            const cleanTyped = cleanString(rawTyped);
+            const cleanTarget = cleanString(rawTarget);
+
+            let isCorrect = (cleanTyped === cleanTarget);
+            let usedHint = typeHintLevel > 0;
+
+            if (isCorrect && !usedHint) {
+                input.classList.replace('border-gray-600', 'border-green-500');
+                feedback.innerHTML = '<span class="text-green-500"><i class="fa-solid fa-check"></i> Perfect!</span>';
+                handleAnswer(true);
+            } else {
+                input.classList.replace('border-gray-600', 'border-red-500');
+                input.value = currentWord.en; 
+                if (usedHint && isCorrect) feedback.innerHTML = `<span class="text-yellow-500">Correct, but hint used.</span>`;
+                else feedback.innerHTML = `<span class="text-red-500">Oops! It was: <b>${currentWord.en}</b></span>`;
+                handleAnswer(false, usedHint);
+            }
+        }
+
+        // --- 4. HANGMAN ---
+        let hmTarget = ""; let hmDisplay = []; let balloons = 5;
+        function renderHangman() {
+            hmTarget = currentWord.en.toUpperCase();
+            hmDisplay = hmTarget.split('').map(c => /[A-Z]/.test(c) ? '_' : c);
+            balloons = 5;
+            
+            let fSize = '2rem';
+            let lSpacing = '0.2em';
+            if (currentWord.en.length > 15) { fSize = '1.2rem'; lSpacing = '0.05em'; }
+            else if (currentWord.en.length > 10) { fSize = '1.5rem'; lSpacing = '0.1em'; }
+
+            let html = `
+                <div class="text-center mb-4 w-full">
+                    <h3 class="text-gray-400 text-sm uppercase tracking-widest">Save the balloons!</h3>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white mt-1 px-2">${currentWord.hu}</h2>
+                </div>
+                <div id="balloons-container" class="flex justify-center gap-2 sm:gap-3 mb-6 h-16 shrink-0">`;
+            const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500'];
+            for(let i=0; i<5; i++) {
+                html += `<div id="balloon-${i}" class="balloon safe w-8 sm:w-10 h-10 sm:h-12 rounded-t-full rounded-b-lg ${colors[i]} relative shadow-[inset_-5px_-5px_10px_rgba(0,0,0,0.3)]">
+                            <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-1 h-3 bg-gray-400"></div>
+                         </div>`;
+            }
+            html += `</div>
+                <div class="w-full mb-6 flex justify-center bg-gray-800 py-3 rounded-xl border border-gray-700 shadow-inner overflow-x-auto px-2">
+                    <div id="hangman-word" class="font-mono font-bold whitespace-nowrap text-white" style="font-size: ${fSize}; letter-spacing: ${lSpacing};">
+                        ${hmDisplay.join('')}
+                    </div>
+                </div>
+                <div id="keyboard" class="flex flex-wrap justify-center w-full max-w-[400px]">`;
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('').forEach(l => {
+                html += `<button onclick="guessHangman('${l}', this)" class="bg-gray-700 rounded shadow font-bold active:scale-90 transition">${l}</button>`;
+            });
+            document.getElementById('game-container').innerHTML = html + `</div><div id="hangman-feedback" class="mt-4 font-bold text-lg h-8 text-center w-full"></div>`;
+        }
+        function guessHangman(letter, btn) {
+            btn.disabled = true; let found = false;
+            for(let i=0; i<hmTarget.length; i++) {
+                if(hmTarget[i] === letter) { hmDisplay[i] = letter; found = true; }
+            }
+            if(found) {
+                btn.classList.replace('bg-gray-700', 'bg-green-600');
+                document.getElementById('hangman-word').innerText = hmDisplay.join('');
+                document.getElementById('hangman-feedback').innerHTML = '<span class="text-green-400 text-sm">✨ Good catch!</span>';
+                if(!hmDisplay.includes('_')) {
+                    document.getElementById('hangman-feedback').innerHTML = '<span class="text-green-500 text-xl font-bold">🎉 Saved!</span>';
+                    document.getElementById('keyboard').style.pointerEvents = 'none';
+                    handleAnswer(true);
+                }
+            } else {
+                btn.classList.replace('bg-gray-700', 'bg-red-900'); btn.classList.add('opacity-30');
+                balloons--;
+                const b = document.getElementById(`balloon-${balloons}`);
+                b.classList.remove('safe'); b.classList.add('popped');
+                document.getElementById('hangman-feedback').innerHTML = '<span class="text-red-400 text-sm">💥 POP!</span>';
+                
+                if(balloons === 0) {
+                    document.getElementById('hangman-feedback').innerHTML = `<span class="text-red-500">Game Over! Word: ${hmTarget}</span>`;
+                    document.getElementById('hangman-word').innerText = hmTarget;
+                    document.getElementById('keyboard').style.pointerEvents = 'none';
+                    handleAnswer(false);
+                }
+            }
+        }
+
+        // --- 5. SCRAMBLE ---
+        let scTarget = ""; let scSlots = []; let scLives = 3;
+        function renderScramble() {
+            scTarget = currentWord.en; scLives = 3;
+            let justLetters = shuffleArray(scTarget.split('').filter(c => /[a-zA-Z]/.test(c)));
+            scSlots = new Array(scTarget.length).fill(null);
+            
+            let html = `
+                <div class="text-center mb-4 w-full">
+                    <h3 class="text-gray-400 text-sm uppercase tracking-widest">Unscramble!</h3>
+                    <div id="sc-lives" class="text-red-500 my-1 text-sm"><i class="fa-solid fa-heart"></i> <i class="fa-solid fa-heart"></i> <i class="fa-solid fa-heart"></i></div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white mt-1 px-2">${currentWord.hu}</h2>
+                </div>
+                <div id="scramble-slots" class="mb-6 w-full px-1">`;
+                
+            const words = scTarget.split(' ');
+            let globalSlotIndex = 0;
+            
+            words.forEach((word, wordIndex) => {
+                html += `<div class="scramble-word-container">`;
+                for(let i=0; i<word.length; i++) {
+                    let char = word[i];
+                    if(!/[a-zA-Z]/.test(char)) {
+                        scSlots[globalSlotIndex] = char;
+                        html += `<div class="scramble-slot text-gray-500 border-transparent">${char}</div>`;
+                    } else {
+                        html += `<div class="scramble-slot cursor-pointer bg-gray-800 rounded-t border-gray-600" id="slot-${globalSlotIndex}" onclick="removeScrambleLetter(${globalSlotIndex})"></div>`;
+                    }
+                    globalSlotIndex++;
+                }
+                html += `</div>`;
+                
+                if (wordIndex < words.length - 1) {
+                    scSlots[globalSlotIndex] = ' ';
+                    globalSlotIndex++;
+                }
+            });
+
+            html += `</div><div id="scramble-letters" class="flex flex-wrap justify-center gap-2 mb-2 w-full px-2">`;
+            justLetters.forEach((l, i) => {
+                html += `<div class="scramble-letter" id="sc-let-${i}" onclick="placeScrambleLetter('${l}', ${i})">${l}</div>`;
+            });
+            
+            html += `</div>
+                     <div class="w-full flex justify-center mb-2">
+                        <button onclick="giveUpScramble()" id="btn-sc-giveup" class="text-gray-500 hover:text-red-400 text-sm font-bold py-1 px-3 transition rounded-full border border-gray-700 hover:border-red-500">
+                            <i class="fa-regular fa-flag mr-1"></i> I'm stuck
+                        </button>
+                     </div>
+                     <div id="scramble-feedback" class="mt-1 font-bold text-lg h-8 text-center w-full"></div>`;
+                     
+            document.getElementById('game-container').innerHTML = html;
+        }
+
+        function placeScrambleLetter(letter, id) {
+            const firstEmpty = scSlots.findIndex(s => s === null);
+            if (firstEmpty !== -1) {
+                scSlots[firstEmpty] = { char: letter, domId: id };
+                document.getElementById(`slot-${firstEmpty}`).innerText = letter;
+                document.getElementById(`sc-let-${id}`).style.visibility = 'hidden';
+                if (scSlots.every(s => s !== null)) checkScramble();
+            }
+        }
+
+        function removeScrambleLetter(slotIdx) {
+            const data = scSlots[slotIdx];
+            if (data && typeof data === 'object') {
+                document.getElementById(`sc-let-${data.domId}`).style.visibility = 'visible';
+                scSlots[slotIdx] = null; document.getElementById(`slot-${slotIdx}`).innerText = '';
+                document.getElementById('scramble-feedback').innerHTML = ''; 
+            }
+        }
+
+        function checkScramble() {
+            const currentStr = scSlots.map(s => typeof s === 'object' ? s.char : s).join('');
+            if (currentStr.toLowerCase() === scTarget.toLowerCase()) {
+                document.getElementById('scramble-feedback').innerHTML = '<span class="text-green-500">Perfect!</span>';
+                document.querySelectorAll('.scramble-slot').forEach(el => el.classList.add('text-green-400', 'border-green-500'));
+                document.getElementById('btn-sc-giveup').classList.add('hidden');
+                handleAnswer(true);
+            } else {
+                scLives--;
+                let hearts = Array(scLives).fill('<i class="fa-solid fa-heart"></i>').join(' ') + 
+                             Array(3-scLives).fill('<i class="fa-regular fa-heart"></i>').join(' ');
+                document.getElementById('sc-lives').innerHTML = hearts;
+                
+                if(scLives > 0) {
+                    document.getElementById('scramble-feedback').innerHTML = '<span class="text-orange-500">Incorrect! Remove letters to try again.</span>';
+                } else {
+                    document.getElementById('scramble-feedback').innerHTML = `<span class="text-red-500">Out of lives! It was: <b>${scTarget}</b></span>`;
+                    document.querySelectorAll('.scramble-slot').forEach(el => el.onclick = null);
+                    document.getElementById('btn-sc-giveup').classList.add('hidden');
+                    handleAnswer(false);
+                }
+            }
+        }
+        
+        function giveUpScramble() {
+            document.getElementById('btn-sc-giveup').classList.add('hidden');
+            document.querySelectorAll('.scramble-letter').forEach(el => el.style.visibility = 'hidden');
+            document.getElementById('scramble-feedback').innerHTML = `<span class="text-red-500">You gave up. The answer is:</span>`;
+            
+            let globalSlotIndex = 0;
+            const words = scTarget.split(' ');
+            
+            words.forEach((word, wordIndex) => {
+                for(let i=0; i<word.length; i++) {
+                    let char = word[i];
+                    if(/[a-zA-Z]/.test(char)) {
+                        let slotEl = document.getElementById(`slot-${globalSlotIndex}`);
+                        slotEl.innerText = char;
+                        slotEl.classList.add('text-red-400', 'border-red-500');
+                        slotEl.onclick = null;
+                    }
+                    globalSlotIndex++;
+                }
+                if (wordIndex < words.length - 1) globalSlotIndex++;
+            });
+            
+            handleAnswer(false, true);
+        }
+
+        // --- 6. FALLING WORDS ---
+        let fallingWordInterval;
+        function renderFallingWords() {
+            const container = document.getElementById('game-container');
+            
+            let choices = [{id: currentWord.id, hu: currentWord.hu, en: currentWord.en}];
+            let pool = shuffleArray([...optionsPool]).filter(w => w.id !== currentWord.id);
+            for(let i=0; i<2; i++) if(pool[i]) choices.push({id: pool[i].id, hu: pool[i].hu, en: pool[i].en});
+            choices = shuffleArray(choices);
+
+            let html = `
+                <div class="text-center mb-2 w-full">
+                    <h3 class="text-gray-400 text-sm uppercase tracking-widest">Catch the pair!</h3>
+                </div>
+                <div id="falling-area" class="mb-4">
+                    <div id="falling-item" class="falling-word">${currentWord.en}</div>
+                </div>
+                <div class="grid grid-cols-1 gap-2 w-full px-2" id="fw-options">
+            `;
+            choices.forEach(choice => {
+                html += `<button onclick="catchWord('${choice.id}', this)" class="bg-gray-800 hover:bg-gray-700 border border-gray-600 py-3 px-2 rounded-lg font-semibold text-sm active:scale-95 shadow">${choice.hu}</button>`;
+            });
+            container.innerHTML = html + `</div><div id="fw-feedback" class="h-8 mt-2 text-center font-bold flex flex-col justify-center w-full"></div>`;
+
+            let pos = -40;
+            const item = document.getElementById('falling-item');
+            const area = document.getElementById('falling-area');
+            const maxDrop = area.offsetHeight;
+
+            fallingWordInterval = setInterval(() => {
+                pos += 1.5; 
+                if(item) item.style.top = pos + 'px';
+                
+                if(pos > maxDrop) {
+                    clearInterval(fallingWordInterval);
+                    document.getElementById('fw-feedback').innerHTML = `<span class="text-red-500">Missed it! Pair was: ${currentWord.hu}</span>`;
+                    disableFwButtons();
+                    handleAnswer(false);
+                }
+            }, 30);
+        }
+
+        function catchWord(selectedId, btn) {
+            clearInterval(fallingWordInterval);
+            disableFwButtons();
+            
+            const isCorrect = (parseInt(selectedId) === currentWord.id);
+            const feedback = document.getElementById('fw-feedback');
+
+            if(isCorrect) {
+                btn.classList.replace('bg-gray-800', 'bg-green-600');
+                document.getElementById('falling-item').style.background = '#10b981';
+                feedback.innerHTML = '<span class="text-green-500">Caught it!</span>';
+            } else {
+                btn.classList.replace('bg-gray-800', 'bg-red-600');
+                document.getElementById('falling-item').style.background = '#ef4444';
+                feedback.innerHTML = `<span class="text-red-500">Wrong pair! It was: ${currentWord.hu}</span>`;
+            }
+            handleAnswer(isCorrect, false, true);
+        }
+        function disableFwButtons() {
+            document.querySelectorAll('#fw-options button').forEach(b => b.disabled = true);
+        }
+
+        // --- EREDMÉNYEK ÉS REVIEW ---
+        function endGame(forced = false) {
+            document.getElementById('streak-counter').classList.add('hidden');
+            document.getElementById('btn-quit').classList.add('hidden');
+            document.getElementById('view-game').classList.add('hidden');
+            
+            const viewResult = document.getElementById('view-result');
+            viewResult.classList.remove('hidden');
+            hideNextButton(); 
+
+            // Háttérszín törlése és alaphelyzetbe állítás
+            viewResult.className = 'view-section w-full text-center flex flex-col h-full overflow-y-auto rounded-xl p-2 transition-colors duration-500';
+
+            const showDamageBtn = document.getElementById('btn-show-damage');
+            const replayBtn = document.getElementById('btn-replay-mistakes');
+            const statsContainer = document.getElementById('stats-container');
+            const resultMessage = document.getElementById('result-message');
+            const resultTitle = document.getElementById('result-title');
+            const starsCont = document.getElementById('stars-container');
+
+            const total = sessionResults.length;
+
+            if (total === 0 && !isFlashcardMode) {
+                resultTitle.innerText = "Session Aborted";
+                resultTitle.className = "text-3xl font-bold mb-2 mt-4 text-gray-400";
+                resultMessage.innerText = "You didn't answer any words.";
+                statsContainer.classList.add('hidden');
+                showDamageBtn.classList.add('hidden');
+                replayBtn.classList.add('hidden');
+                return;
+            }
+
+            if (isFlashcardMode) {
+                resultTitle.innerText = "Done!";
+                resultTitle.className = "text-3xl font-bold mb-2 mt-4 text-emerald-400";
+                resultMessage.innerText = "Awesome review session!";
+                statsContainer.classList.add('hidden');
+                starsCont.innerHTML = '<i class="fa-solid fa-book text-blue-400 drop-shadow-lg"></i>';
+                showDamageBtn.classList.add('hidden'); 
+                replayBtn.classList.add('hidden'); 
+                viewResult.classList.add('bg-blue-900/20'); // Flashcard mód esetén visszafogott kékes
+                return;
+            }
+
+            showDamageBtn.classList.remove('hidden');
+            statsContainer.classList.remove('hidden');
+
+            const correctFirstTime = sessionResults.filter(r => r.correct).length;
+            const mistakesNum = mistakes.length;
+            const percent = (correctFirstTime / total) * 100;
+
+            document.getElementById('res-total').innerText = total;
+            document.getElementById('res-correct').innerText = correctFirstTime;
+            document.getElementById('res-mistakes').innerText = mistakesNum;
+
+            const starClass = "fa-solid fa-star text-yellow-400 drop-shadow-lg";
+            const emptyStarClass = "fa-regular fa-star text-gray-600";
+            
+            // Dinamikus üzenetek, színek és konfetti logika
+            const titleClass = "text-3xl font-bold mb-2 mt-4 ";
+
+            if (percent === 100) {
+                starsCont.innerHTML = `<i class="${starClass}"></i><i class="${starClass}"></i><i class="${starClass}"></i>`;
+                resultTitle.innerText = "FLAWLESS VICTORY! 👑";
+                resultTitle.className = titleClass + "text-yellow-400";
+                resultMessage.innerText = "You're a wizard!";
+                viewResult.classList.add('bg-green-900/30');
+                triggerConfetti();
+            } else if (percent >= 90) {
+                starsCont.innerHTML = `<i class="${starClass}"></i><i class="${starClass}"></i><i class="${starClass}"></i>`;
+                resultTitle.innerText = "INSANE JOB! 🔥";
+                resultTitle.className = titleClass + "text-emerald-400";
+                resultMessage.innerText = "Almost perfect!";
+                viewResult.classList.add('bg-emerald-900/20');
+                triggerConfetti();
+            } else if (percent >= 70) {
+                starsCont.innerHTML = `<i class="${starClass}"></i><i class="${starClass}"></i><i class="${emptyStarClass}"></i>`;
+                resultTitle.innerText = "Solid performance! 💪";
+                resultTitle.className = titleClass + "text-blue-400";
+                resultMessage.innerText = "Keep pushing!";
+                viewResult.classList.add('bg-blue-900/20');
+            } else if (percent >= 50) {
+                starsCont.innerHTML = `<i class="${starClass}"></i><i class="${emptyStarClass}"></i><i class="${emptyStarClass}"></i>`;
+                resultTitle.innerText = "Not bad! 🎯";
+                resultTitle.className = titleClass + "text-orange-400";
+                resultMessage.innerText = "But you can do better!";
+                viewResult.classList.add('bg-orange-900/20');
+            } else {
+                starsCont.innerHTML = `<i class="${emptyStarClass}"></i><i class="${emptyStarClass}"></i><i class="${emptyStarClass}"></i>`;
+                resultTitle.innerText = "Ouch! 🔄";
+                resultTitle.className = titleClass + "text-red-500";
+                resultMessage.innerText = "Time for a quick redo!";
+                viewResult.classList.add('bg-red-900/20');
+            }
+
+            if (isRedoRound) {
+                showDamageBtn.innerHTML = '<i class="fa-solid fa-chart-line mr-2"></i> See your progress';
+            } else {
+                showDamageBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass mr-2"></i> Show me the damage';
+            }
+
+            if (mistakesNum > 0 && !forced) {
+                replayBtn.classList.remove('hidden');
+                const uniqueMistakesCount = new Set(mistakes.map(m => m.id)).size;
+                replayBtn.innerHTML = `<i class="fa-solid fa-rotate-left mr-2"></i> Redo the oopsies (${uniqueMistakesCount})`;
+            }
+            else replayBtn.classList.add('hidden');
+        }
+
+        // Konfetti indító függvény (csak 90% felett hívódik meg)
+        function triggerConfetti() {
+            var duration = 3000;
+            var end = Date.now() + duration;
+
+            (function frame() {
+                confetti({
+                    particleCount: 5,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0, y: 0.8 },
+                    colors: ['#3b82f6', '#10b981', '#f59e0b']
+                });
+                confetti({
+                    particleCount: 5,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1, y: 0.8 },
+                    colors: ['#3b82f6', '#10b981', '#f59e0b']
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            }());
+        }
+
+        function showReview() {
+            document.getElementById('view-result').classList.add('hidden');
+            document.getElementById('view-review').classList.remove('hidden');
+            
+            document.getElementById('review-title').innerHTML = isRedoRound 
+                ? '<i class="fa-solid fa-chart-line mr-2"></i>Your Progress' 
+                : '<i class="fa-solid fa-clipboard-list mr-2"></i>The Damage';
+
+            const list = document.getElementById('review-list');
+            list.innerHTML = '';
+
+            if(sessionResults.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-400">No data to review.</p>';
+                return;
+            }
+
+            const uniqueSessionResults = [];
+            const seenIds = new Set();
+            for(let r of sessionResults) {
+                if(!seenIds.has(r.word.id)) {
+                    uniqueSessionResults.push(r);
+                    seenIds.add(r.word.id);
+                } else {
+                    if(!r.correct) {
+                        const existing = uniqueSessionResults.find(x => x.word.id === r.word.id);
+                        if(existing) existing.correct = false;
+                    }
+                }
+            }
+
+            uniqueSessionResults.forEach(res => {
+                let statusIcon = '';
+                
+                if (isRedoRound) {
+                    statusIcon = res.correct 
+                        ? '<span class="text-gray-400 text-sm mr-2">❌ <i class="fa-solid fa-arrow-right mx-1"></i></span> <i class="fa-solid fa-check text-green-500 text-xl"></i>' 
+                        : '<span class="text-gray-400 text-sm mr-2">❌ <i class="fa-solid fa-arrow-right mx-1"></i></span> <i class="fa-solid fa-xmark text-red-500 text-xl"></i>';
+                } else {
+                    statusIcon = res.correct 
+                        ? '<i class="fa-solid fa-check text-green-500 text-xl"></i>' 
+                        : '<i class="fa-solid fa-xmark text-red-500 text-xl"></i>';
+                }
+
+                let html = `
+                    <div class="p-3 rounded-lg bg-gray-900 border-l-4 ${res.correct ? 'border-green-500' : 'border-red-500'}">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-white text-lg">${res.word.en}</span>
+                            <div class="flex items-center">${statusIcon}</div>
+                        </div>
+                        <div class="text-sm text-gray-400">${res.word.hu}</div>
+                    </div>
+                `;
+                list.innerHTML += html;
+            });
+        }
+
+        function closeReview() {
+            document.getElementById('view-review').classList.add('hidden');
+            document.getElementById('view-result').classList.remove('hidden');
+        }
+
+        function replayMistakes() { 
+            const uniqueMistakes = Array.from(new Set(mistakes.map(m => m.id)))
+                                        .map(id => mistakes.find(m => m.id === id));
+            startGame(uniqueMistakes); 
+        }
+        
+        function goHome() {
+            document.getElementById('view-result').classList.add('hidden');
+            document.getElementById('view-review').classList.add('hidden');
+            document.getElementById('view-menu').classList.remove('hidden');
+        }
+
+        window.onload = () => {
+            selectMode('flashcard');
+            parseData();
+        };
+    </script>
+</body>
+</html>
